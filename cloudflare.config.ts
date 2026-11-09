@@ -8,7 +8,7 @@ export default defineConfig({
     name: target.worker,
     compatibilityDate: target.compatibilityDate,
     workersDev: true,
-    previewUrls: false,
+    previewUrls: true,
     assets: { notFoundHandling: "none" },
   },
 })
