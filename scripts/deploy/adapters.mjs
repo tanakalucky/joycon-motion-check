@@ -35,23 +35,31 @@ export function createGitHub(token) {
         validateRun({ ...run, conclusion: "success" })
         return 0
       }
-      const candidates = await api(`/commits/${run.head_sha}/pulls?per_page=100`)
+      const associated = run.pull_requests?.length
+        ? run.pull_requests
+        : await api(`/commits/${run.head_sha}/pulls?per_page=100`)
+      const candidates = await Promise.all(associated.map((pr) => pull(pr.number)))
       const matches = candidates.filter(
-        (pr) => pr.head.sha === run.head_sha && pr.base.ref === "main",
+        (pr) =>
+          pr.base.ref === "main" &&
+          pr.base.repo.full_name === target.repository &&
+          pr.head.repo?.id === run.head_repository?.id &&
+          pr.head.ref === run.head_branch,
       )
       if (matches.length !== 1)
         throw new Error("Cannot identify exactly one PR; use manual reconciliation")
-      validateRun({ ...run, conclusion: "success" }, matches[0])
+      // Association comes from GitHub, while the triggering commit may no longer be the PR head.
+      validateRun(
+        { ...run, conclusion: "success" },
+        {
+          ...matches[0],
+          head: { ...matches[0].head, sha: run.head_sha },
+        },
+      )
       return matches[0].number
     },
-    async successfulRun(pr, runId, head) {
+    async successfulRun(pr, head) {
       const sha = pr?.head.sha ?? head
-      if (runId) {
-        const run = await api(`/actions/runs/${integer(runId)}`)
-        if (run.head_sha !== sha || run.conclusion !== "success") return undefined
-        validateRun(run, pr)
-        return run
-      }
       const event = pr ? "pull_request" : "push"
       const runs = await api(
         `/actions/workflows/ci.yml/runs?head_sha=${sha}&event=${event}&status=success&per_page=100`,
@@ -103,13 +111,12 @@ export function createGitHub(token) {
       })
       return JSON.parse(payload.toString())
     },
-    async comment(number, body, sha) {
+    async comment(number, body, sha, expectedState = "open") {
       const current = await pull(number)
       validatePull(current, number)
       if (sha && (current.state !== "open" || current.head.sha !== sha))
         throw new Error("PR changed before comment")
-      if (!sha && body.includes("削除済み") && current.state !== "closed")
-        throw new Error("PR reopened before cleanup comment")
+      if (current.state !== expectedState) throw new Error("PR state changed before comment")
       const find = async () => {
         const matches = []
         for (let page = 1; ; page++) {

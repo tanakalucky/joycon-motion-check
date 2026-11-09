@@ -1,7 +1,7 @@
 import { previewName, target } from "./target.mjs"
 
-export async function reconcile({ github, cloudflare, number, runId }) {
-  if (number === 0) return deployProduction(github, cloudflare, runId)
+export async function reconcile({ github, cloudflare, number }) {
+  if (number === 0) return deployProduction(github, cloudflare)
   const name = previewName(number)
   for (let attempt = 0; attempt < 3; attempt++) {
     const pr = await github.pull(number)
@@ -11,16 +11,21 @@ export async function reconcile({ github, cloudflare, number, runId }) {
         await cloudflare.remove(name)
       } catch (error) {
         await github
-          .comment(number, `${target.marker}\nPreview 削除の確認待ちです。`)
+          .comment(number, `${target.marker}\nPreview 削除の確認待ちです。`, undefined, "closed")
           .catch(() => {})
         throw error
       }
       const latest = await github.pull(number)
       if (latest.state !== "closed") continue
-      await github.comment(number, `${target.marker}\nPreview は削除済みです。`)
+      await github.comment(
+        number,
+        `${target.marker}\nPreview は削除済みです。`,
+        undefined,
+        "closed",
+      )
       return "removed"
     }
-    const run = await github.successfulRun(pr, runId)
+    const run = await github.successfulRun(pr)
     if (!run) {
       await github.comment(number, `${target.marker}\n最新コミットの CI / Preview 更新待ちです。`)
       return "waiting"
@@ -29,7 +34,6 @@ export async function reconcile({ github, cloudflare, number, runId }) {
     const payload = await github.artifact(run)
     const before = await github.pull(number)
     if (before.state !== "open" || before.head.sha !== run.head_sha) {
-      runId = undefined
       continue
     }
     let result
@@ -43,7 +47,6 @@ export async function reconcile({ github, cloudflare, number, runId }) {
     }
     const after = await github.pull(number)
     if (after.state !== "open" || after.head.sha !== run.head_sha) {
-      runId = undefined
       continue
     }
     const url = validatePreviewResult(result, name)
@@ -57,9 +60,9 @@ export async function reconcile({ github, cloudflare, number, runId }) {
   throw new Error("PR changed repeatedly; run manual reconciliation")
 }
 
-async function deployProduction(github, cloudflare, runId) {
+async function deployProduction(github, cloudflare) {
   const head = await github.main()
-  const run = await github.successfulRun(undefined, runId, head)
+  const run = await github.successfulRun(undefined, head)
   if (!run) throw new Error("No successful CI for current main")
   validateRun(run)
   if (run.head_sha !== head) throw new Error("Stale production CI")

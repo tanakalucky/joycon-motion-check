@@ -28,6 +28,7 @@
    変数が未設定・false の間、Deploy job は skipped となり公開しない。
 4. アプリ PR の CI 成功後、必要な初期設定と対象 Worker を確認して有効化し、
    Deploy を main から手動実行して `pr=N` の preview を確認する。
+   新規 Worker の初回 preview に先行する本番公開や placeholder は不要。
    アプリ PR のレビュー・CI・preview 確認後に main へ取り込むと、その push の CI 成功で本番を公開する。
    本番の再照合は `pr=0` を指定する。基盤だけの CI には配信成果物がないため本番公開に使わない。
    以後、PR の作成・追加 push・reopen の CI 成功で `pr-N` を作成・更新し、
@@ -44,7 +45,9 @@ Bun の版は package.json、Cloudflare CLI は `cf@1.0.0-beta.28`、実行用 N
 24.22.1 に固定。cf を Bun runtime で起動しない。CLI 更新時は実 help と Build Output
 の構造を再確認し、production / preview 両方を資格情報なしで検証する。
 
-CI は `bun run check`、`bun run test`、`bun run build` を行う。
+基盤だけの CI は `bun run check` と `bun run test` のみを行い、配信成果物は作成しない。
+以下の build・artifact 処理は後続のアプリ PR で追加する契約である。
+アプリ追加後の CI は `bun run check`、`bun run test`、`bun run build` を行う。
 E2E は実施しない。`dist` は静的ファイルの JSON にまとめ、7 日保持する。
 特権側は repo、workflow、run、成功結果、PR/head、artifact の出所を照合する。
 PR 由来のコードや設定は実行せず、zip をファイルシステムへ展開せずに JSON を読む。
@@ -61,7 +64,9 @@ Deploy workflow の手動実行は main からのみ行い、`pr=N` で当該 PR
 開いていれば現在 head の成功 CI を選び、閉じていれば削除する。`pr=0` は現在 main の成功 CI を使う。
 artifact が期限切れなら CI を再実行してから再照合する。
 
-全 deploy / cleanup / コメントは同じ concurrency key で直列化する。
+読取専用 job が GitHub のイベント出所から対象 PR の正の整数を解決する。
+repo・Worker・PR ごとの concurrency key で deploy / cleanup / コメントを直列化し、本番は別の key を使う。
+遅れたイベントでも現在 head の成功 CI を選び直し、古い run の失敗で成功表示を更新待ちに戻さない。
 GitHub concurrency の pending 置換や通信障害でイベントが欠ける場合は手動再照合する。
 操作直前・直後の PR/main を確認し、古い成功 URL を最新として投稿しない。
 更新中の push は再照合し、CI 待ちのコメントに切り替える。
