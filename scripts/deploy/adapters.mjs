@@ -155,7 +155,7 @@ export function createGitHub(token) {
   }
 }
 
-export function createCloudflare(token) {
+export function createCloudflare(token, execute = execFileSync) {
   if (!token) throw new Error("CLOUDFLARE_API_TOKEN is not configured")
   const cli = resolve("node_modules/cf/bin/cf")
   const environment = {
@@ -174,12 +174,14 @@ export function createCloudflare(token) {
         const args = name
           ? ["previews", "deploy", name, "--prebuilt", "--mode", "production"]
           : ["deploy", "--prebuilt", "--mode", "production", "--message", sha]
-        const result = execFileSync(process.execPath, [cli, ...args], {
+        const result = execute(process.execPath, [cli, ...args], {
           cwd: directory,
           env: environment,
           maxBuffer: 1024 * 1024,
           stdio: ["ignore", "pipe", "pipe"],
         })
+        // cf production deploy reports success through its exit status, not JSON stdout.
+        if (!name) return
         return JSON.parse(result.toString())
       } finally {
         await rm(directory, { recursive: true, force: true })
