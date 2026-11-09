@@ -1,0 +1,50 @@
+name: Deploy
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  pull_request_target:
+    branches: [main]
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: PR number to reconcile (0 for current main)
+        required: true
+        type: string
+permissions: {}
+# One lock also covers URL comments, cleanup and manual recovery.
+concurrency:
+  group: joycon-motion-check-cloudflare
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: >-
+      github.repository == 'tanakalucky/joycon-motion-check' &&
+      vars.DEPLOY_ENABLED == 'true' &&
+      (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: cloudflare
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.22.1
+      # Only the reviewed default-branch lockfile is installed, without hooks.
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: node scripts/deploy/run.mjs
+        env:
+          DEPLOY_ENABLED: ${{ vars.DEPLOY_ENABLED }}
+          GH_TOKEN: ${{ github.token }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
