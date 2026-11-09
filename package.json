@@ -3,10 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "bun test scripts/deploy",
-    "format": "bun fmt --no-script scripts cloudflare.config.ts .github/workflows docs package.json bunfig.toml README.md",
-    "format:check": "bun fmt --no-script --check scripts cloudflare.config.ts .github/workflows docs package.json bunfig.toml README.md",
-    "lint": "oxlint --deny-warnings scripts cloudflare.config.ts",
+    "build": "bun scripts/build.js",
+    "test": "bun test",
+    "format": "bun fmt --no-script src tests scripts index.html package.json bunfig.toml README.md cloudflare.config.ts .github/workflows docs",
+    "format:check": "bun fmt --no-script --check src tests scripts index.html package.json bunfig.toml README.md cloudflare.config.ts .github/workflows docs",
+    "lint": "oxlint --deny-warnings src tests scripts",
     "check": "bun run format:check && bun run lint"
   },
   "devDependencies": {
