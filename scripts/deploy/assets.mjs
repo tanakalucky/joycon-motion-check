@@ -72,7 +72,7 @@ export async function prepareOutput(directory, payload, isPreview) {
       name: target.worker,
       compatibilityDate: target.compatibilityDate,
       workersDev: true,
-      previewUrls: false,
+      previewUrls: true,
       assets: { notFoundHandling: "none" },
     }),
   )
