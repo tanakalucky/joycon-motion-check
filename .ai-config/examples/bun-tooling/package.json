@@ -1,0 +1,15 @@
+{
+  "name": "bun-tooling-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "format": "bun fmt --no-script .",
+    "format:check": "bun fmt --no-script --check .",
+    "lint": "oxlint --deny-warnings .",
+    "check": "bun run format:check && bun run lint"
+  },
+  "devDependencies": {
+    "oxlint": "1.92.0"
+  },
+  "packageManager": "bun@1.4.4"
+}

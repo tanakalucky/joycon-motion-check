@@ -1,0 +1,73 @@
+name: Deploy
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  pull_request_target:
+    branches: [main]
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: PR number to reconcile (0 for current main)
+        required: true
+        type: string
+permissions: {}
+jobs:
+  resolve:
+    if: >-
+      github.repository == 'tanakalucky/joycon-motion-check' &&
+      vars.DEPLOY_ENABLED == 'true' &&
+      (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    outputs:
+      number: ${{ steps.target.outputs.number }}
+      key: ${{ steps.target.outputs.key }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.22.1
+      - id: target
+        run: node scripts/deploy/resolve.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+  deploy:
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: cloudflare
+    concurrency:
+      group: ${{ github.repository }}-joycon-motion-check-${{ needs.resolve.outputs.key }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.22.1
+      # Only the reviewed default-branch lockfile is installed, without hooks.
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: node scripts/deploy/run.mjs
+        env:
+          TARGET_PR: ${{ needs.resolve.outputs.number }}
+          DEPLOY_ENABLED: ${{ vars.DEPLOY_ENABLED }}
+          GH_TOKEN: ${{ github.token }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

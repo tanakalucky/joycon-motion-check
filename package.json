@@ -1,0 +1,17 @@
+{
+  "name": "joycon-motion-check",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test scripts/deploy",
+    "format": "bun fmt --no-script scripts cloudflare.config.ts .github/workflows docs package.json bunfig.toml README.md",
+    "format:check": "bun fmt --no-script --check scripts cloudflare.config.ts .github/workflows docs package.json bunfig.toml README.md",
+    "lint": "oxlint --deny-warnings scripts cloudflare.config.ts",
+    "check": "bun run format:check && bun run lint"
+  },
+  "devDependencies": {
+    "cf": "1.0.0-beta.28",
+    "oxlint": "1.92.0"
+  },
+  "packageManager": "bun@1.4.4"
+}
