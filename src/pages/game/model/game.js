@@ -11,55 +11,76 @@ export class Race {
   }
 
   reset() {
-    this.progress = 0
+    this.players = new Map()
     this.phase = "ready"
     this.phaseTime = 0
-    this.penalized = false
-    this.redBaseline = null
+    this.winner = null
   }
 
-  start() {
+  start(ids) {
+    this.reset()
+    this.players = new Map(ids.map((id) => [id, { progress: 0, penalized: false, baseline: null }]))
     this.phase = "green"
-    this.phaseTime = 0
   }
 
-  observeRed(sample) {
-    if (this.phase !== "red" || this.phaseTime < RED_GRACE_MS || this.penalized) return
-    const baseline = (this.redBaseline ??= sample)
+  observeRed(id, sample) {
+    const player = this.players.get(id)
+    if (!player || this.phase !== "red" || this.phaseTime < RED_GRACE_MS || player.penalized) return
+
+    const baseline = (player.baseline ??= sample)
     if (Math.hypot(sample.x - baseline.x, sample.y - baseline.y, sample.z - baseline.z) >= 0.2) {
-      this.progress = Math.max(0, this.progress - RED_PENALTY)
-      this.penalized = true
+      player.progress = Math.max(0, player.progress - RED_PENALTY)
+      player.penalized = true
     }
   }
 
-  forgetRedBaseline() {
-    this.redBaseline = null
+  forgetRedBaseline(id) {
+    const player = this.players.get(id)
+    if (player) player.baseline = null
   }
 
-  advance(ms, score) {
-    if (!["green", "red"].includes(this.phase)) return
-    if (!Number.isFinite(ms) || !Number.isFinite(score) || ms <= 0) return
-
-    const strength = Math.min(1, Math.max(0, (score - 0.1) / 0.65))
+  advance(ms, scores) {
+    if (!["green", "red"].includes(this.phase) || !Number.isFinite(ms) || ms <= 0) return
+    const racers = [...this.players].map(([id, player]) => [id, player, speed(scores.get(id))])
     let remaining = Math.min(ms, 100)
     while (remaining > 0) {
       const duration = this.phase === "green" ? GREEN_MS : RED_MS
       const step = Math.min(remaining, duration - this.phaseTime)
-      if (this.phase === "green") {
-        this.progress = Math.min(1, this.progress + 0.00028 * strength * step)
-        if (this.progress === 1) {
-          this.phase = "won"
-          return
-        }
-      }
+      if (this.phase === "green" && this.advancePlayers(racers, step)) return
+
       this.phaseTime += step
       remaining -= step
       if (this.phaseTime >= duration) {
         this.phase = this.phase === "green" ? "red" : "green"
         this.phaseTime = 0
-        this.penalized = false
-        this.redBaseline = null
+        for (const player of this.players.values()) {
+          player.penalized = false
+          player.baseline = null
+        }
       }
     }
   }
+
+  advancePlayers(racers, step) {
+    let finishTime = step
+    for (const [id, player, rate] of racers) {
+      if (rate === 0) continue
+      const crossing = (1 - player.progress) / rate
+      if (crossing < finishTime || (crossing === finishTime && this.winner === null)) {
+        finishTime = crossing
+        this.winner = id
+      }
+    }
+    for (const [, player, rate] of racers) {
+      player.progress = Math.min(1, player.progress + rate * finishTime)
+    }
+    if (this.winner === null) return false
+    this.players.get(this.winner).progress = 1
+    this.phase = "won"
+    return true
+  }
+}
+
+function speed(score) {
+  return Number.isFinite(score) ? 0.00028 * Math.min(1, Math.max(0, (score - 0.1) / 0.65)) : 0
 }

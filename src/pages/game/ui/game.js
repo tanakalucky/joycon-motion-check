@@ -1,7 +1,7 @@
-import { JoyConSession, supportMessage } from "../../../entities/joycon/index.js"
-import { MotionProcessor } from "../../../entities/motion/index.js"
-import { Race, STALE_MS } from "../model/game.js"
+import { supportMessage } from "../../../entities/joycon/index.js"
+import { Race } from "../model/game.js"
 import { gameMarkup } from "./markup.js"
+import { mountPlayer } from "./player.js"
 
 export function mountGame(root) {
   root.innerHTML = gameMarkup()
@@ -11,34 +11,24 @@ export function mountGame(root) {
   const reset = select("#game-reset")
   const signal = select("#game-signal")
   const hint = select("#game-hint")
-  const runner = select("#game-runner")
-  const progress = select("#game-progress")
-  const strength = select("#game-strength")
   const unsupported = supportMessage(window.isSecureContext, navigator.hid)
-  const motion = new MotionProcessor()
   const race = new Race()
-  let connection = "disconnected"
-  let reading = null
-  let arrival = null
+  const players = []
   let lastFrame = null
   let redStartedAt = null
   let disposed = false
-  const session = new JoyConSession({
-    hid: navigator.hid,
-    secure: window.isSecureContext,
-    onState,
-    onPacket,
-  })
 
   connect.addEventListener("click", () => {
-    if (connection === "connected" || connection === "connecting") void session.disconnect()
-    else if (!unsupported && connection !== "cancelling") void session.connect()
+    if (disposed || unsupported || race.phase !== "ready" || pickerBusy()) return
+    const player = players.find((entry) => !entry.connected()) ?? addPlayer()
+    void player.connect()
   })
   start.addEventListener("click", () => {
-    if (!usable(performance.now()) || race.phase !== "ready") return
-    race.start()
-    lastFrame = performance.now()
-    render()
+    const now = performance.now()
+    if (!canStart(now)) return
+    race.start(players.filter((player) => player.connected()).map((player) => player.id))
+    lastFrame = now
+    render(now)
   })
   reset.addEventListener("click", () => {
     race.reset()
@@ -46,79 +36,71 @@ export function mountGame(root) {
     render()
   })
   const visibility = () => {
-    if (document.hidden) void session.disconnect("画面を離れたため切断しました。")
+    lastFrame = null
+    if (document.hidden) for (const player of players) void player.disconnect()
+    render()
   }
   document.addEventListener("visibilitychange", visibility)
   const timer = setInterval(tick, 40)
-  onState("disconnected", unsupported || "Bluetoothでペアリングした機器を1台選んでください。")
+  render()
 
   return () => {
     disposed = true
     clearInterval(timer)
     document.removeEventListener("visibilitychange", visibility)
-    void session.dispose()
+    for (const player of players) void player.dispose()
   }
 
-  function onState(state, message) {
-    if (disposed) return
-    connection = state
-    motion.reset()
-    race.forgetRedBaseline()
-    reading = null
-    arrival = null
-    select("#game-connection").textContent = message
-    connect.disabled = Boolean(unsupported) || state === "cancelling"
-    connect.textContent =
-      {
-        connected: "切断する",
-        connecting: "キャンセル",
-        cancelling: "終了中…",
-      }[state] ?? "Joy-Conに接続 →"
-    render()
+  function addPlayer() {
+    const panel = document.createElement("section")
+    select("#game-players").append(panel)
+    const player = mountPlayer(panel, {
+      id: players.length + 1,
+      race,
+      render,
+      isRedReport: (time) => redStartedAt !== null && time > redStartedAt,
+    })
+    players.push(player)
+    return player
   }
 
-  function onPacket(samples, now) {
-    if (disposed) return
-    if (arrival !== null && now - arrival > STALE_MS) {
-      motion.reset()
-      race.forgetRedBaseline()
-    }
-    arrival = now
-    for (const sample of samples) {
-      const next = motion.push(sample)
-      if (!next) continue
-      reading = next
-      // WebHID identifies report arrival, not when each physical movement happened.
-      if (redStartedAt !== null && now > redStartedAt && usable(now)) race.observeRed(next)
-    }
+  function pickerBusy() {
+    return players.some((player) => player.busy())
+  }
+
+  function canStart(now) {
+    const connected = players.filter((player) => player.connected())
+    return (
+      race.phase === "ready" &&
+      !pickerBusy() &&
+      connected.length > 0 &&
+      connected.every((player) => player.active(now))
+    )
   }
 
   function tick() {
     const now = performance.now()
-    if (usable(now) && lastFrame !== null) {
+    const scores = new Map(
+      players
+        .filter((player) => player.active(now))
+        .map((player) => [player.id, player.score(lastFrame)]),
+    )
+    if (scores.size && lastFrame !== null) {
       const before = race.phase
-      race.advance(now - lastFrame, reading.score)
+      race.advance(now - lastFrame, scores)
       if (before !== race.phase) redStartedAt = race.phase === "red" ? now : null
     }
-    lastFrame = now
+    lastFrame = scores.size ? now : null
     render(now)
   }
 
-  function usable(now) {
-    return (
-      !document.hidden &&
-      connection === "connected" &&
-      reading &&
-      !reading.warming &&
-      now - arrival <= STALE_MS
-    )
-  }
-
   function render(now = performance.now()) {
-    const active = usable(now)
+    if (disposed) return
     const running = race.phase === "green" || race.phase === "red"
+    const active = players.some((player) => player.active(now))
     const phase = running && !active ? "paused" : race.phase
-    start.disabled = !active || race.phase !== "ready"
+    connect.disabled = Boolean(unsupported) || race.phase !== "ready" || pickerBusy()
+    start.disabled = !canStart(now)
     reset.disabled = race.phase === "ready"
     signal.dataset.phase = phase
     const label = {
@@ -126,19 +108,14 @@ export function mountGame(root) {
       green: "青信号 · 振って進む",
       red: "赤信号 · 止まる",
       paused: "一時停止",
-      won: "ゴール！",
+      won: `プレイヤー ${race.winner} の勝ち！`,
     }[phase]
     if (signal.textContent !== label) signal.textContent = label
-    const note = active
-      ? race.phase === "red" && race.penalized
-        ? "動きを検知したため少し戻りました。"
-        : ""
-      : connection === "connected" && arrival !== null && now - arrival <= STALE_MS
-        ? "準備中。Joy-Conを静止させてください。"
-        : "信号が届くまでゲームは進みません。"
-    if (hint.textContent !== note) hint.textContent = note
-    runner.style.left = `${race.progress * 100}%`
-    progress.value = race.progress
-    strength.value = active ? Math.min(1, reading.score) : 0
+    hint.textContent =
+      unsupported ||
+      (phase === "paused"
+        ? "コントローラーの信号を待っています。再接続するには「最初から」を押してください。"
+        : "")
+    for (const player of players) player.render(now)
   }
 }

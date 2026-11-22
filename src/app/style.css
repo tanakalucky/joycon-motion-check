@@ -1281,3 +1281,16 @@ footer {
 .game-actions .primary-button {
   width: auto;
 }
+
+.game-player {
+  border-top: 1px solid var(--border);
+  padding: 12px 0;
+}
+.game-player h3 {
+  font-size: 15px;
+  margin: 0 0 5px;
+}
+.game-player .game-hint {
+  color: var(--muted);
+  margin-bottom: 8px;
+}
