@@ -189,6 +189,19 @@ p {
   color: var(--muted);
   display: block;
 }
+.devices-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 12px;
+}
+.devices-toolbar h2 {
+  font-size: 16px;
+  margin: 0;
+}
+.monitor-layout + .monitor-layout {
+  margin-top: 22px;
+}
 .monitor-layout {
   display: grid;
   grid-template-columns: 330px minmax(0, 1fr);
@@ -432,10 +445,10 @@ p {
   color: #687466;
   margin: 15px 0 0;
 }
-.result-panel[data-level="fast"] #classification {
+.result-panel[data-level="fast"] [data-field="classification"] {
   color: #a7583b;
 }
-.result-panel[data-level="slow"] #classification {
+.result-panel[data-level="slow"] [data-field="classification"] {
   color: #69745f;
 }
 .chart-panel {
