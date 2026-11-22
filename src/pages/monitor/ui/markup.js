@@ -11,110 +11,14 @@ export function monitorMarkup() {
       <span class="tiny-label">DESIGNED FOR</span>
       <strong>初代 Joy-Con <span>L / R</span>
       </strong>
-      <span>Bluetooth · 片方1台</span>
+      <span>Bluetooth · 複数台対応</span>
       </div>
     </section>
-    <div class="monitor-layout">
-      <section class="panel connection-panel">
-        <div class="section-label">
-      <span>01 / CONNECTION</span>
-      <span class="status" id="connection-status">未接続</span>
-      </div>
-        <div class="controller-stage">${controllerSvg()}<span class="hardware-tag">Joy-Con (L) / ILLUSTRATION</span>
-      </div>
-        <h2>Joy-Conを接続</h2>
-        <button class="primary-button" id="connect">Joy-Conに接続 →</button>
-        <p class="connection-message" id="connection-message" role="status">
-      </p>
-        <a class="small muted" href="#/mechanism">接続手順・確認方法 ↗</a>
-      </section>
-      <div class="readings">
-        <section class="panel result-panel" id="result" data-level="disconnected">
-          <div class="section-label">
-      <span>02 / MOTION LEVEL</span>
-      <span id="packet-rate">— packets/s</span>
-      </div>
-          <div class="result-content">
-            <div>
-      <p class="tiny-label">動きの分類</p>
-      <h2 id="classification" role="status">接続待ち</h2>
-      <p id="reading-note">
-      </p>
-      </div>
-            ${movementSvg()}
-            <div class="score">
-      <span class="tiny-label">動きの強さ / RMS</span>
-      <strong id="score">—</strong>
-      <span>g <small>（推定）</small>
-      </span>
-      </div>
-          </div>
-          <div class="meter" id="motion-meter">
-      <span class="meter-slow">
-      </span>
-      <span class="meter-normal">
-      </span>
-      <span class="meter-fast">
-      </span>
-      <i id="meter-marker" aria-hidden="true">
-      </i>
-      </div>
-          <div class="meter-labels">
-      <span>遅い</span>
-      <span>普通</span>
-      <span>速い</span>
-      </div>
-          <p class="measurement-caution">移動速度ではなく、加速度から見た動きの強さの目安です。</p>
-        </section>
-        <section class="panel chart-panel">
-          <div class="section-label">
-      <span>03 / LIVE SIGNAL</span>
-      <span id="last-received">最終受信 —</span>
-      </div>
-          <div class="chart-heading">
-      <h2>動きの波形</h2>
-      <span class="legend">
-      <i>
-      </i> 重力推定を除いた大きさ</span>
-      </div>
-          <div class="chart-wrap">
-      <span class="chart-axis">g</span>
-      <div class="chart-labels">
-      <span>2.0</span>
-      <span>1.0</span>
-      <span>0.0</span>
-      </div>
-            <svg class="wave-chart" viewBox="0 0 680 175" preserveAspectRatio="none" role="img" aria-label="直近8秒の補正後の加速度。2 gを超える波形は上端に表示。">
-              <path class="grid-line" d="M0 30H680 M0 90H680 M0 150H680 M0 0V150 M170 0V150 M340 0V150 M510 0V150 M680 0V150"/>
-              <polyline id="wave-line" points="" fill="none" stroke="currentColor" stroke-width="2.5" vector-effect="non-scaling-stroke"/>
-            </svg>
-            <span class="chart-empty" id="chart-empty">受信待ち</span>
-          </div>
-          <div class="time-labels">
-      <span>−8秒</span>
-      <span>現在</span>
-      </div>
-          <div class="axis-readings">
-            <div>
-      <span class="axis-dot x">X</span>
-      <strong id="axis-x">—</strong>
-      <small>g</small>
-      </div>
-            <div>
-      <span class="axis-dot y">Y</span>
-      <strong id="axis-y">—</strong>
-      <small>g</small>
-      </div>
-            <div>
-      <span class="axis-dot z">Z</span>
-      <strong id="axis-z">—</strong>
-      <small>g</small>
-      </div>
-          </div>
-          <p class="small muted axis-note">3軸：重力を含む受信値（固定係数で換算）</p>
-        </section>
-      </div>
+    <div class="devices-toolbar">
+      <h2>コントローラー</h2>
+      <button id="add-device" class="text-button">＋ Joy-Conを追加</button>
     </div>
+    <div id="device-panels"></div>
     <section class="panel threshold-panel">
       <div>
       <p class="section-label">04 / TUNING</p>
@@ -146,4 +50,107 @@ export function monitorMarkup() {
       </a>
       </aside>
     </section>`
+}
+
+export function deviceMarkup(number) {
+  return `
+      <section class="panel connection-panel">
+        <div class="section-label">
+      <span>01 / CONTROLLER ${number}</span>
+      <span class="status" data-field="connection-status">未接続</span>
+      </div>
+        <div class="controller-stage">${controllerSvg()}<span class="hardware-tag">Joy-Con (L) / ILLUSTRATION</span>
+      </div>
+        <h2>コントローラー ${number}</h2>
+        <button class="primary-button" data-field="connect">Joy-Conに接続 →</button>
+        <p class="connection-message" data-field="connection-message" role="status">
+      </p>
+        <a class="small muted" href="#/mechanism">接続手順・確認方法 ↗</a>
+      </section>
+      <div class="readings">
+        <section class="panel result-panel" data-field="result" data-level="disconnected">
+          <div class="section-label">
+      <span>02 / MOTION LEVEL</span>
+      <span data-field="packet-rate">— packets/s</span>
+      </div>
+          <div class="result-content">
+            <div>
+      <p class="tiny-label">動きの分類</p>
+      <h2 data-field="classification" role="status">接続待ち</h2>
+      <p data-field="reading-note">
+      </p>
+      </div>
+            ${movementSvg()}
+            <div class="score">
+      <span class="tiny-label">動きの強さ / RMS</span>
+      <strong data-field="score">—</strong>
+      <span>g <small>（推定）</small>
+      </span>
+      </div>
+          </div>
+          <div class="meter" data-field="motion-meter">
+      <span class="meter-slow">
+      </span>
+      <span class="meter-normal">
+      </span>
+      <span class="meter-fast">
+      </span>
+      <i data-field="meter-marker" aria-hidden="true">
+      </i>
+      </div>
+          <div class="meter-labels">
+      <span>遅い</span>
+      <span>普通</span>
+      <span>速い</span>
+      </div>
+          <p class="measurement-caution">移動速度ではなく、加速度から見た動きの強さの目安です。</p>
+        </section>
+        <section class="panel chart-panel">
+          <div class="section-label">
+      <span>03 / LIVE SIGNAL</span>
+      <span data-field="last-received">最終受信 —</span>
+      </div>
+          <div class="chart-heading">
+      <h2>動きの波形</h2>
+      <span class="legend">
+      <i>
+      </i> 重力推定を除いた大きさ</span>
+      </div>
+          <div class="chart-wrap">
+      <span class="chart-axis">g</span>
+      <div class="chart-labels">
+      <span>2.0</span>
+      <span>1.0</span>
+      <span>0.0</span>
+      </div>
+            <svg class="wave-chart" viewBox="0 0 680 175" preserveAspectRatio="none" role="img" aria-label="直近8秒の補正後の加速度。2 gを超える波形は上端に表示。">
+              <path class="grid-line" d="M0 30H680 M0 90H680 M0 150H680 M0 0V150 M170 0V150 M340 0V150 M510 0V150 M680 0V150"/>
+              <polyline data-field="wave-line" points="" fill="none" stroke="currentColor" stroke-width="2.5" vector-effect="non-scaling-stroke"/>
+            </svg>
+            <span class="chart-empty" data-field="chart-empty">受信待ち</span>
+          </div>
+          <div class="time-labels">
+      <span>−8秒</span>
+      <span>現在</span>
+      </div>
+          <div class="axis-readings">
+            <div>
+      <span class="axis-dot x">X</span>
+      <strong data-field="axis-x">—</strong>
+      <small>g</small>
+      </div>
+            <div>
+      <span class="axis-dot y">Y</span>
+      <strong data-field="axis-y">—</strong>
+      <small>g</small>
+      </div>
+            <div>
+      <span class="axis-dot z">Z</span>
+      <strong data-field="axis-z">—</strong>
+      <small>g</small>
+      </div>
+          </div>
+          <p class="small muted axis-note">3軸：重力を含む受信値（固定係数で換算）</p>
+        </section>
+      </div>`
 }

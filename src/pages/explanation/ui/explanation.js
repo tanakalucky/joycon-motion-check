@@ -14,7 +14,7 @@ export function mountExplanation(root) {
     <section class="explanation-section">
       <div class="section-heading">
       <p class="eyebrow">01 / SETUP</p>
-      <h2>片方のJoy-Conをつなぐ</h2>
+      <h2>Joy-Conをつなぐ</h2>
       </div>
       <div class="connection-flow">
         <div>
@@ -26,7 +26,7 @@ export function mountExplanation(root) {
         <div>
       <span class="flow-number">02</span>
       <h3>ブラウザーで許可</h3>
-      <p>HTTPSまたはlocalhostのPC版Chrome / Edgeで開き、「Joy-Conに接続」から1台を選びます。他の接続アプリは終了してください。</p>
+      <p>HTTPSまたはlocalhostのPC版Chrome / Edgeで開き、「Joy-Conに接続」から1台を選び、2台目以降は「＋ Joy-Conを追加」で別の機器を選びます。他の接続アプリは終了してください。</p>
       </div>
         <span class="flow-arrow" aria-hidden="true">→</span>
         <div>
@@ -92,7 +92,7 @@ export function mountExplanation(root) {
       <ol class="manual-list">
       <li>
       <strong>接続と静止</strong>
-      <span>L / Rを1台ずつ試す。受信数が増え、3軸の合成が静止時におおよそ1 g、準備後のRMSが小さくなることを確認。</span>
+      <span>複数台を接続し、1台ずつ動かして対応する番号の値が変わることを確認。受信数が増え、3軸の合成が静止時におおよそ1 g、準備後のRMSが小さくなることを確認。</span>
       </li>
       <li>
       <strong>軽い動きから、少し強い動きへ</strong>

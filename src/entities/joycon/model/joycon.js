@@ -3,6 +3,10 @@
  * Changed: limited Bluetooth IMU adapter, acknowledged commands, scoped lifecycle,
  * DataView offsets, and individual approximate-g samples. See /third-party.txt.
  */
+// The same HIDDevice object can be returned by successive chooser requests, even
+// for controllers with identical names and product IDs. Release only after close.
+const owners = new WeakMap()
+
 export class JoyConSession {
   constructor({
     hid,
@@ -28,6 +32,7 @@ export class JoyConSession {
     this.busy = true
     const session = { cancelled: false, device: null, sequence: 0, pending: null, lastTime: null }
     this.session = session
+    let outcome = ["disconnected", "選択をキャンセルしました。"]
     this.onState("connecting", "Joy-Conを選択してください。")
     try {
       const devices = await this.hid.requestDevice({
@@ -37,12 +42,11 @@ export class JoyConSession {
         ],
       })
       if (session.cancelled) return
-      if (!devices.length) {
-        this.onState("disconnected", "選択をキャンセルしました。")
-        return
-      }
-      const device = devices[0]
-      if (!isJoyCon(device)) throw new Error("初代Joy-Con L / Rを選択してください。")
+      if (!devices.length) return
+      const device = devices.find(isJoyCon)
+      if (!device) throw new Error("初代Joy-Con L / Rを選択してください。")
+      if (owners.has(device)) throw new Error("このJoy-Conは別のパネルで使用中です。")
+      owners.set(device, session)
       session.device = device
       session.input = (event) => this.receive(session, event)
       session.disconnect = (event) => {
@@ -56,22 +60,21 @@ export class JoyConSession {
       await this.command(session, 0x03, 0x30)
       if (session.cancelled) return
       session.ready = true
-      this.onState("connected", device.productId === 0x2006 ? "Joy-Con (L)" : "Joy-Con (R)")
+      outcome = ["connected", device.productId === 0x2006 ? "Joy-Con (L)" : "Joy-Con (R)"]
     } catch (error) {
-      if (!session.cancelled)
-        this.onState(
-          error.name === "NotFoundError" ? "disconnected" : "error",
-          error.name === "NotFoundError"
-            ? "選択をキャンセルしました。"
-            : `接続できませんでした。OSのBluetooth接続と他のアプリを確認してください。${error.message ? " " + error.message : ""}`,
-        )
+      if (error.name !== "NotFoundError")
+        outcome = [
+          "error",
+          `接続できませんでした。OSのBluetooth接続と他のアプリを確認してください。${error.message ? " " + error.message : ""}`,
+        ]
     } finally {
       if (!session.ready || session.cancelled) {
         await this.cleanup(session)
-        if (this.session === session) this.session = null
+        this.release(session)
       }
       this.busy = false
-      if (session.cancelled && !this.disposed) this.onState("disconnected", "接続を終了しました。")
+      if (session.cancelled) outcome = ["disconnected", "接続を終了しました。"]
+      if (!this.disposed) this.onState(...outcome)
     }
   }
 
@@ -83,7 +86,7 @@ export class JoyConSession {
       session.pending?.reject(new Error("接続をキャンセルしました。"))
       await this.cleanup(session)
       // Keep a pending chooser/open locked until its own finally closes the device.
-      if (!this.busy && this.session === session) this.session = null
+      if (!this.busy) this.release(session)
     }
     if (!this.disposed)
       this.onState(
@@ -153,16 +156,20 @@ export class JoyConSession {
   }
 
   async cleanup(session) {
-    if (!session.device) return
+    if (!session.device || owners.get(session.device) !== session) return
     session.device.removeEventListener("inputreport", session.input)
     this.hid.removeEventListener("disconnect", session.disconnect)
     if (session.device.opened) {
       try {
-        await session.device.close()
+        await (session.closing ??= session.device.close())
       } catch {
         /* A physically disconnected device may already be closed. */
       }
     }
+  }
+  release(session) {
+    if (this.session === session) this.session = null
+    if (session.device && owners.get(session.device) === session) owners.delete(session.device)
   }
 }
 
