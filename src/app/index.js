@@ -1,5 +1,12 @@
 import { mountExplanation } from "../pages/explanation/index.js"
+import { mountGame } from "../pages/game/index.js"
 import { mountMonitor } from "../pages/monitor/index.js"
+
+const pages = {
+  monitor: { title: "モニター", mount: mountMonitor },
+  explanation: { title: "仕組みを知る", mount: mountExplanation },
+  game: { title: "ミニゲーム", mount: mountGame },
+}
 
 let unmount = () => {}
 let route = null
@@ -18,18 +25,18 @@ window.addEventListener("pageshow", (event) => {
 renderRoute()
 
 function renderRoute() {
-  const next = location.hash === "#/mechanism" ? "explanation" : "monitor"
+  const next = { "#/mechanism": "explanation", "#/game": "game" }[location.hash] ?? "monitor"
   if ((location.hash === "#main" && route !== null) || route === next) return
   const initial = route === null
   unmount()
   route = next
   const main = document.querySelector("#main")
-  unmount = next === "explanation" ? mountExplanation(main) : mountMonitor(main)
+  unmount = pages[next].mount(main)
   document.querySelectorAll("[data-route]").forEach((link) => {
     if (link.dataset.route === next) link.setAttribute("aria-current", "page")
     else link.removeAttribute("aria-current")
   })
-  document.title = `${next === "explanation" ? "仕組みを知る" : "モニター"} | Joy-Con Motion Check`
+  document.title = `${pages[next].title} | Joy-Con Motion Check`
   if (!initial) {
     main.focus()
     window.scrollTo(0, 0)
