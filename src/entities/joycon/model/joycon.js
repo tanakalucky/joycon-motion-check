@@ -13,10 +13,11 @@ export class JoyConSession {
     secure = true,
     onState,
     onPacket,
+    onDisconnecting,
     now = () => performance.now(),
     timeout = 2000,
   }) {
-    Object.assign(this, { hid, secure, onState, onPacket, now, timeout })
+    Object.assign(this, { hid, secure, onState, onPacket, onDisconnecting, now, timeout })
     this.session = null
     this.busy = false
     this.disposed = false
@@ -81,8 +82,10 @@ export class JoyConSession {
   async disconnect(message = "切断しました。") {
     const session = this.session
     if (session) {
+      const wasCancelled = session.cancelled
       session.cancelled = true
       session.ready = false
+      if (!wasCancelled && !this.disposed) this.onDisconnecting?.()
       session.pending?.reject(new Error("接続をキャンセルしました。"))
       await this.cleanup(session)
       // Keep a pending chooser/open locked until its own finally closes the device.
